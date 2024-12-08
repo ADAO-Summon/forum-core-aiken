@@ -3,7 +3,7 @@ use aiken/collection/pairs
 use cardano/address.{Credential}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{OutputReference, Redeemer, ScriptPurpose, Transaction}
-use common/utils.{check_withdraw_redeemer, find_utxo_with_nft, get_inline_data}
+use common/utils.{check_withdraw_redeemer, find_utxo_with_nft, get_inline_data, check_proper_burn_with_policy}
 
 // Forum: Where Mere Assembly Gives Way to Governance
 
@@ -49,16 +49,17 @@ validator forum(
         let input = find_utxo_with_nft(forum_policy, forum_name, tx)
 
         when (our_datum, r) is {
-          (Forum(_, _), UpdateGovernance(new_forum_datum)) ->
+          (Forum(_, _), UpdateGovernance(new_forum_datum)) -> {
             // Update Governance
-            // Here we enforce that there is a burnt execution token
-            todo
+            let p: PolicyId = execution_logic
+            check_proper_burn_with_policy(tx.mint, tx.inputs, p)
+          }
           (Forum(_, forum_data), TakeAction(forum_action)) ->
             // Forum Action
             check_withdraw_redeemer(redeemers, forum_logic, (forum_data, forum_action))
-          (Stake(stake_data), TakeAction(stake_action)) ->
+          (Stake(stake_data), TakeAction(_)) ->
             // Move Stake
-            check_withdraw_redeemer(redeemers, stake_logic, (stake_data, stake_action))
+            check_withdraw_redeemer(redeemers, stake_logic, stake_data)
           (Proposal(proposal_data), TakeAction(proposal_action)) ->
             // Vote Proposal, Vote Proposal Order, Vote Batch, and Advance Proposal
             check_withdraw_redeemer(

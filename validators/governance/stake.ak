@@ -1,21 +1,20 @@
 use cardano/address.{Credential}
+use cardano/assets.{AssetName, PolicyId}
 
 pub type StakeDatum {
+  owner: Credential,
   delegate: Credential,
+  locks: List<(AssetName, Int)>,
+  stake_token: (PolicyId, AssetName),
+  // reward_token: (PolicyId, AssetName),
 }
-
-pub type StakeRedeemer =
-  (ByteArray, StakeActionType)
-
-pub type StakeActionType {
-  Unlock
-  ApplyNewLock
-}
-
-// Basically work on the redeemer as much as possible.
 
 validator base_stake {
-  withdraw(r: (StakeDatum, StakeRedeemer), _a, _c) {
+  withdraw(r: StakeDatum, _a, tx) {
+    // Don't allow the user to remove locks before they should be able to.
+    // Only allow the user to remove the UTxO if the locks are removed or all are unlocked.
+    // When removing, we must burn the stake token.
+    // Require signature from owner, or delegate, delegate cannot take tokens.
     True
   }
 

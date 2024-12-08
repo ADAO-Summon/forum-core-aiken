@@ -1,9 +1,11 @@
 use cardano/address.{Credential}
 use cardano/assets.{AssetName}
+use governance/execution.{ExecutionDatum}
 
 // Proposal Names are their uniqueness.
 pub type ProposalDatum {
-  Voting
+  Order(ProposalVote)
+  Voting(List<(Int, ExecutionDatum)>)
   Finished
   ExecutionReady
 }
@@ -30,11 +32,11 @@ validator base_proposal {
   withdraw(r: (ProposalDatum, ProposalRedeemer), _a, _c) {
     // Here we want to allow the state transition to occur.
     when r is {
-      (Voting, Vote(_)) -> todo
-      (Voting, VoteOrder(_)) -> todo
-      (Voting, BatchVote(_)) -> todo
-      (Voting, Advance) -> todo
-      (Voting, Execute) -> todo
+      (Voting(votes), Vote(_)) -> todo // Uses stake logic
+      (Voting(votes), VoteOrder(_)) -> todo // Uses stake logic / new token
+      (Voting(votes), BatchVote(_)) -> todo // Merges Orders
+      (Voting(votes), Advance) -> todo // Moves to Finished.
+      (Voting(votes), Execute) -> todo // Burns the proposal and mints execution token(s).
       _ -> fail
     }
   }

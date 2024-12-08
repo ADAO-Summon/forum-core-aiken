@@ -14,7 +14,7 @@ pub type FinishProposal {
   proposal_name: AssetName,
 }
 
-pub type ExecutionRedeemer {
+pub type ExecutionRedeemer { // This is actually the datum, but it is the redeemer here.
   Mint(FinishProposal)
   Burn(ExecutionDatum)
 }

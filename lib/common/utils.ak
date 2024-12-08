@@ -8,7 +8,7 @@ use cardano/transaction.{
   Withdraw,
   Input,
 }
-use cardano/address.{Script, Inline}
+use cardano/address.{Script}
 use aiken/collection/list
 use aiken/collection/pairs
 use aiken/collection/dict
