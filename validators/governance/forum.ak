@@ -2,94 +2,88 @@ use aiken/collection/list
 use aiken/collection/pairs
 use cardano/address.{Credential}
 use cardano/assets.{AssetName, PolicyId}
-use cardano/transaction.{OutputReference, Transaction}
-use common/utils.{get_inline_data}
+use cardano/transaction.{OutputReference, Redeemer, ScriptPurpose, Transaction}
+use common/utils.{check_withdraw_redeemer, find_utxo_with_nft, get_inline_data}
 
 // Forum: Where Mere Assembly Gives Way to Governance
 
+pub type ForumConfig = Data
+
+// These are parameters that should be used by the different scripts.
+
 pub type ForumDatum {
-  Forum(
-    // Execution Logic
-    ByteArray,
-    // Proposal Logic
-    ByteArray,
-    // Extra Data
-    Data
-    )
+  Forum(ForumConfig, Data)
   Stake(Data)
   Proposal(Data)
-  Execution(Data) // This must contain the execution logic and appropriate data.
+  Execution(ByteArray, Data)
 }
 
-pub type GovHubRedeemer {
-    UpdateGovernance(ForumDatum)
-    Other(Data)
+pub type ForumRedeemer {
+  UpdateGovernance(ForumDatum)
+  TakeAction(Data)
 }
 
-/// Forum works as a proxy for the proposal and execution policies.
+/// Forum works as a proxy for the proposal, stake, and execution scripts.
 /// It remains highly flexible for different governance mechanisms.
 /// Stake logic is hard-coded to prevent users from facing changing behavior for their assets.
 validator forum(
-  forum_logic: Credential,
-  stake_logic: Option<Credential>,
+  // Forum Parameters / These are script hashes.
+  forum_logic: ByteArray,
+  stake_logic: ByteArray,
+  proposal_logic: ByteArray,
+  execution_logic: ByteArray,
+  // The state thread for the forum
   forum_policy: PolicyId,
   forum_name: AssetName,
 ) {
-  spend(d: Option<ForumDatum>, r: GovHubRedeemer, out_ref: OutputReference, tx: Transaction) {
-    expect Some(our_datum) = d
+  spend(
+    d: Option<ForumDatum>,
+    r: ForumRedeemer,
+    out_ref: OutputReference,
+    tx: Transaction,
+  ) {
+    let Transaction { redeemers, .. } = tx
+    when d is {
+      Some(our_datum) -> {
+        // First we find the element containing our control NFT.
+        let input = find_utxo_with_nft(forum_policy, forum_name, tx)
 
-    // First we find the element containing our NFT.
-    let Transaction { reference_inputs, inputs, withdrawals, .. } = tx
-    let maybe_ref =
-      list.find(
-        reference_inputs,
-        fn(i) {
-          assets.quantity_of(i.output.value, forum_policy, forum_name) == 1
-        },
-      )
-    let input =
-      when maybe_ref is {
-        Some(ref_input) -> ref_input
-        None -> {
-          expect Some(input) =
-            list.find(
-              inputs,
-              fn(i) {
-                assets.quantity_of(i.output.value, forum_policy, forum_name) == 1
-              },
+        when (our_datum, r) is {
+          (Forum(_, _), UpdateGovernance(new_forum_datum)) ->
+            // Update Governance
+            // Here we enforce that there is a burnt execution token
+            todo
+          (Forum(_, forum_data), TakeAction(forum_action)) ->
+            // Forum Action
+            check_withdraw_redeemer(redeemers, forum_logic, (forum_data, forum_action))
+          (Stake(stake_data), TakeAction(stake_action)) ->
+            // Move Stake
+            check_withdraw_redeemer(redeemers, stake_logic, (stake_data, stake_action))
+          (Proposal(proposal_data), TakeAction(proposal_action)) ->
+            // Vote Proposal, Vote Proposal Order, Vote Batch, and Advance Proposal
+            check_withdraw_redeemer(
+              redeemers,
+              proposal_logic,
+              (proposal_data, proposal_action),
             )
-          input
+          (Execution(execution_hash, execution_data), TakeAction(_)) ->
+            // Execute Proposal
+            check_withdraw_redeemer(redeemers, execution_hash, execution_data)
+          _ -> fail
         }
       }
-    expect control_datum: ForumDatum = get_inline_data(input.output.datum)
-
-    when (our_datum, r) is {
-      (Forum(_, _, _), UpdateGovernance(new_forum_datum)) -> { //
-        // Here we enforce that there is a burnt execution token and the appropriate stake logic executes.
-        todo
-      }
-      (Forum(_, _, other_data), Other(_)) -> {
-        // Here we enforce that the forum logic executes.
-        todo
-      }
-      (Stake(stake_data), Other(_)) -> {
-        // Here we enforce that the stake logic executes.
-        todo
-      }
-      (Proposal(proposal_data), Other(_)) -> {
-        // Here we enforce that the proposal logic executes.
-        todo
-      }
-      (Execution(execution_data), Other(_)) -> {
-        // Here we enforce that the execution logic executes.
-        todo
-      }
-      _ -> {
-        fail
-      }
+      _ ->
+        // Custom logic can be added to the forum with or without datum.
+        check_withdraw_redeemer(redeemers, forum_logic, None)
     }
   }
 
+  else(_) {
+    fail
+  }
+}
+
+validator forum_logic {
   else(_) {
     fail
   }
