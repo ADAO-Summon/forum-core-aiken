@@ -7,7 +7,12 @@ use cardano/transaction.{
   Redeemer,
   Withdraw,
   Input,
+  OutputReference,
 }
+use aiken/crypto.{blake2b_256}
+use aiken/cbor
+use aiken/primitive/bytearray
+use aiken/primitive/string
 use cardano/address.{Script}
 use aiken/collection/list
 use aiken/collection/pairs
@@ -91,4 +96,24 @@ pub fn check_proper_burn_with_policy_and_name(
 ) {
   expect (-1 == assets.quantity_of(mint, policy_id, asset_name))
   check_proper_burn(mint, inputs, policy_id, fn(input, acc) { acc + assets.quantity_of(input.output.value, policy_id, asset_name) })
+}
+
+pub fn gen_token_name(
+  output_reference: OutputReference,
+) -> AssetName {
+  blake2b_256(
+    cbor.serialise(output_reference),
+  )
+}
+
+pub fn gen_token_name2(
+  output_reference: OutputReference,
+  mint_index: Int,
+) -> AssetName {
+  blake2b_256(
+    bytearray.concat(
+      cbor.serialise(output_reference),
+      string.to_bytearray(string.from_int(mint_index)),
+    ),
+  )
 }
