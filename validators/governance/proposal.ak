@@ -2,6 +2,11 @@ use cardano/address.{Credential}
 use cardano/assets.{AssetName}
 use governance/execution.{ExecutionDatum}
 
+pub type ForumConfig {
+  minimum_quorum: Int,
+  minimum_votes: Int,
+}
+
 // Proposal Names are their uniqueness.
 pub type ProposalDatum {
   Order(ProposalVote)
@@ -17,7 +22,9 @@ pub type ProposalVote {
   stake: AssetName,
 }
 
-pub type ProposalRedeemer {
+pub type ProposalRedeemer = (ForumConfig, ProposalDatum, ProposalAction)
+
+pub type ProposalAction {
   CreateProposal(ProposalDatum)
   Vote(ProposalVote)
   VoteOrder(ProposalVote)
@@ -29,14 +36,14 @@ pub type ProposalRedeemer {
 // Basically work on the redeemer as much as possible.
 
 validator base_proposal {
-  withdraw(r: (ProposalDatum, ProposalRedeemer), _a, _c) {
+  withdraw(r: ProposalRedeemer, _a, _c) {
     // Here we want to allow the state transition to occur.
     when r is {
-      (Voting(votes), Vote(_)) -> todo // Uses stake logic
-      (Voting(votes), VoteOrder(_)) -> todo // Uses stake logic / new token
-      (Voting(votes), BatchVote(_)) -> todo // Merges Orders
-      (Voting(votes), Advance) -> todo // Moves to Finished.
-      (Voting(votes), Execute) -> todo // Burns the proposal and mints execution token(s).
+      (_, Voting(votes), Vote(_)) -> todo // Uses stake logic
+      (_, Voting(votes), VoteOrder(_)) -> todo // Uses stake logic / new token
+      (_, Voting(votes), BatchVote(_)) -> todo // Merges Orders
+      (_, Voting(votes), Advance) -> todo // Moves to Finished.
+      (_, Voting(votes), Execute) -> todo // Burns the proposal and mints execution token(s).
       _ -> fail
     }
   }

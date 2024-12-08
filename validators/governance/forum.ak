@@ -4,12 +4,9 @@ use cardano/address.{Credential}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{OutputReference, Redeemer, ScriptPurpose, Transaction}
 use common/utils.{check_withdraw_redeemer, find_utxo_with_nft, get_inline_data, check_proper_burn_with_policy}
+use governance/proposal.{ForumConfig}
 
 // Forum: Where Mere Assembly Gives Way to Governance
-
-pub type ForumConfig = Data
-
-// These are parameters that should be used by the different scripts.
 
 pub type ForumDatum {
   Forum(ForumConfig, Data)
@@ -25,7 +22,6 @@ pub type ForumRedeemer {
 
 /// Forum works as a proxy for the proposal, stake, and execution scripts.
 /// It remains highly flexible for different governance mechanisms.
-/// Stake logic is hard-coded to prevent users from facing changing behavior for their assets.
 validator forum(
   // Forum Parameters / These are script hashes.
   forum_logic: ByteArray,
@@ -60,13 +56,15 @@ validator forum(
           (Stake(stake_data), TakeAction(_)) ->
             // Move Stake
             check_withdraw_redeemer(redeemers, stake_logic, stake_data)
-          (Proposal(proposal_data), TakeAction(proposal_action)) ->
+          (Proposal(proposal_data), TakeAction(proposal_action)) -> {
+            expect Forum(config, _) = get_inline_data(input.output.datum)
             // Vote Proposal, Vote Proposal Order, Vote Batch, and Advance Proposal
             check_withdraw_redeemer(
               redeemers,
               proposal_logic,
-              (proposal_data, proposal_action),
+              (config, proposal_data, proposal_action),
             )
+          }
           (Execution(execution_hash, execution_data), TakeAction(_)) ->
             // Execute Proposal
             check_withdraw_redeemer(redeemers, execution_hash, execution_data)
